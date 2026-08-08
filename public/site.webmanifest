@@ -1,0 +1,18 @@
+{
+  "name": "安心问候",
+  "short_name": "安心问候",
+  "description": "每天一句话，让远方家人知道今天是否需要打电话。",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f7f5",
+  "theme_color": "#176b46",
+  "icons": [
+    {
+      "src": "/brand-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

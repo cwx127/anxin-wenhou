@@ -6,6 +6,10 @@
 
 项目聚焦一个核心能力：**60 秒安心回执**。用药、健康和紧急表达只作为回执中的事实线索，不扩展为健康大盘、诊断或自动救援产品。
 
+在线体验：[https://anxin-wenhou.pages.dev/](https://anxin-wenhou.pages.dev/)
+
+公开版本是同一浏览器内的交互演示，不会发送真实通知、跨设备同步或拨打电话。所有演示数据仅保存在当前浏览器。
+
 ## 产品预览
 
 ### 老人端
@@ -81,6 +85,19 @@ npm run check
 ```
 
 该命令依次运行领域测试、TypeScript 检查和 Vite 生产构建。
+
+## Cloudflare Pages
+
+生产站点使用 Cloudflare Pages。构建设置如下：
+
+| 设置 | 值 |
+|---|---|
+| 生产分支 | `main` |
+| 构建命令 | `npm run build` |
+| 输出目录 | `dist` |
+| Node.js | `22.12.0` |
+
+`public/_headers` 为 HTML 设置即时校验缓存和必要安全头，为带内容哈希的静态资源设置长期缓存。项目没有注册 Service Worker，避免照护状态页面展示离线旧数据。
 
 ## 工程结构
 

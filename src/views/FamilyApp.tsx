@@ -118,6 +118,10 @@ export function FamilyApp({ notify }: FamilyAppProps) {
   const primaryContact = data.contacts[0];
   const needsAction = checkIn.state === 'attention' || checkIn.state === 'urgent' || checkIn.state === 'no-response';
 
+  const demoCall = (name = primaryContact.name) => {
+    notify(`公开演示不会拨打真实电话；已展示联系${name}的操作入口`, 'info');
+  };
+
   const navItems = [
     { id: 'receipt' as const, label: '今日回执', icon: FileText },
     { id: 'timeline' as const, label: '过程记录', icon: History },
@@ -166,9 +170,9 @@ export function FamilyApp({ notify }: FamilyAppProps) {
             <button className="icon-button icon-button-soft" onClick={() => setDemoOpen(true)} aria-label="切换演示场景" title="切换演示场景">
               <TestTube2 aria-hidden="true" />
             </button>
-            <a className={`button ${checkIn.state === 'urgent' ? 'button-danger' : 'button-primary'}`} href={`tel:${primaryContact.phone.replace(/\s/g, '')}`}>
+            <button className={`button ${checkIn.state === 'urgent' ? 'button-danger' : 'button-primary'}`} onClick={() => demoCall()}>
               <PhoneCall aria-hidden="true" />给妈妈打电话
-            </a>
+            </button>
           </div>
         </header>
 
@@ -254,9 +258,9 @@ export function FamilyApp({ notify }: FamilyAppProps) {
 
                 {needsAction && checkIn.familyAction === 'pending' && (
                   <>
-                    <a className={`button button-full ${checkIn.state === 'urgent' ? 'button-danger' : 'button-primary'}`} href={`tel:${primaryContact.phone.replace(/\s/g, '')}`}>
+                    <button className={`button button-full ${checkIn.state === 'urgent' ? 'button-danger' : 'button-primary'}`} onClick={() => demoCall()}>
                       <PhoneCall aria-hidden="true" />拨打 {primaryContact.name}
-                    </a>
+                    </button>
                     <button className="button button-outline button-full" onClick={() => {
                       markFamilyContacted();
                       notify('已记录为家属人工联系');
@@ -373,7 +377,7 @@ export function FamilyApp({ notify }: FamilyAppProps) {
                     <span className="contact-order">{contact.priority}</span>
                     <span className="avatar avatar-neutral">{contact.name.slice(0, 1)}</span>
                     <div><strong>{contact.name}</strong><small>{contact.relation} · {contact.phone}</small></div>
-                    <a className="icon-button" href={`tel:${contact.phone.replace(/\s/g, '')}`} aria-label={`联系${contact.name}`} title="打电话"><PhoneCall aria-hidden="true" /></a>
+                    <button className="icon-button" onClick={() => demoCall(contact.name)} aria-label={`演示联系${contact.name}`} title="演示联系流程"><PhoneCall aria-hidden="true" /></button>
                   </article>
                 ))}
               </section>

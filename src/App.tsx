@@ -1,20 +1,19 @@
-import { ShieldCheck, UserRound, Users } from 'lucide-react';
+import { MonitorSmartphone, ShieldCheck, UserRound, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Toast } from './components/Toast';
+import { readStorage, ROLE_STORAGE_KEY, writeStorage } from './storage';
 import type { AppRole } from './types';
 import { FamilyApp } from './views/FamilyApp';
 import { SeniorApp } from './views/SeniorApp';
 
-const ROLE_KEY = 'anxin-checkin-active-role';
-
 export default function App() {
   const [role, setRole] = useState<AppRole>(() =>
-    localStorage.getItem(ROLE_KEY) === 'family' ? 'family' : 'senior',
+    readStorage(ROLE_STORAGE_KEY) === 'family' ? 'family' : 'senior',
   );
   const [toast, setToast] = useState<{ id: number; message: string; tone: 'success' | 'info' } | null>(null);
 
   useEffect(() => {
-    localStorage.setItem(ROLE_KEY, role);
+    writeStorage(ROLE_STORAGE_KEY, role);
   }, [role]);
 
   useEffect(() => {
@@ -53,6 +52,11 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      <div className="demo-banner" role="status">
+        <MonitorSmartphone aria-hidden="true" />
+        <span><strong>公开交互演示</strong> 数据仅在当前浏览器同步，不会发送通知或拨打真实电话。</span>
+      </div>
 
       <div id="top">
         {role === 'senior' ? <SeniorApp notify={notify} /> : <FamilyApp notify={notify} />}

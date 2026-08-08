@@ -27,12 +27,16 @@ type SpeechRecognitionResultLike = {
   results: { [index: number]: { [index: number]: { transcript: string } } };
 };
 
+type SpeechRecognitionErrorLike = {
+  error?: string;
+};
+
 type SpeechRecognitionLike = {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
   onresult: ((event: SpeechRecognitionResultLike) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: SpeechRecognitionErrorLike) => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
@@ -93,7 +97,13 @@ export function SeniorApp({ notify }: SeniorAppProps) {
   const latestMessage = data.messages[0];
   const needsAnswer = checkIn.state === 'pending' || checkIn.state === 'no-response';
 
-  useEffect(() => () => recognitionRef.current?.stop(), []);
+  useEffect(() => () => {
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      // The browser may already have ended the recognition session.
+    }
+  }, []);
 
   const speakMessage = () => {
     if (!latestMessage) return;
@@ -119,26 +129,51 @@ export function SeniorApp({ notify }: SeniorAppProps) {
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'zh-CN';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.onresult = (event) => {
-      setTranscript(event.results[0]?.[0]?.transcript ?? '');
-    };
-    recognition.onerror = () => {
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'zh-CN';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.onresult = (event) => {
+        setTranscript(event.results[0]?.[0]?.transcript ?? '');
+      };
+      recognition.onerror = (event) => {
+        const message = event.error === 'not-allowed'
+          ? '未获得麦克风权限，可直接输入后提交'
+          : event.error === 'network'
+            ? '语音服务暂时不可用，可直接输入后提交'
+            : '这次没有听清，可以再说一次或直接输入';
+        setListening(false);
+        notify(message, 'info');
+      };
+      recognition.onend = () => setListening(false);
+      recognitionRef.current = recognition;
+      setListening(true);
+      recognition.start();
+    } catch {
+      recognitionRef.current = null;
       setListening(false);
-      notify('这次没有听清，可以再说一次或直接输入', 'info');
-    };
-    recognition.onend = () => setListening(false);
-    recognitionRef.current = recognition;
-    setListening(true);
-    recognition.start();
+      notify('当前环境无法启动语音识别，可直接输入后提交', 'info');
+    }
   };
 
   const stopListening = () => {
-    recognitionRef.current?.stop();
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      // The browser may already have ended the recognition session.
+    }
+    recognitionRef.current = null;
     setListening(false);
+  };
+
+  const closeVoiceModal = () => {
+    stopListening();
+    setVoiceOpen(false);
+  };
+
+  const demoCall = () => {
+    notify('公开演示不会拨打真实电话，请切换到家属端查看联系流程', 'info');
   };
 
   const submitVoice = (event: FormEvent) => {
@@ -149,7 +184,7 @@ export function SeniorApp({ notify }: SeniorAppProps) {
       return;
     }
     const nextReceipt = submitVoiceCheckIn(value);
-    setVoiceOpen(false);
+    closeVoiceModal();
     setTranscript('');
     notify(nextReceipt.level === 'normal' ? '今日问候已完成' : '已把需要关注的内容整理给家人');
   };
@@ -260,9 +295,9 @@ export function SeniorApp({ notify }: SeniorAppProps) {
               {receipt.level === 'urgent' && (
                 <div className="urgent-contact-row">
                   <div><strong>请先保持在安全位置</strong><span>系统不会自动代拨，请直接联系家人或当地急救。</span></div>
-                  <a className="button button-danger button-large" href={`tel:${primaryContact.phone.replace(/\s/g, '')}`}>
+                  <button className="button button-danger button-large" onClick={demoCall}>
                     <PhoneCall aria-hidden="true" />联系{primaryContact.name}
-                  </a>
+                  </button>
                 </div>
               )}
 
@@ -311,9 +346,9 @@ export function SeniorApp({ notify }: SeniorAppProps) {
               <span className="avatar avatar-neutral">{primaryContact.name.slice(0, 1)}</span>
               <span><strong>{primaryContact.name}</strong><small>{primaryContact.relation} · 第一联系人</small></span>
             </div>
-            <a className="icon-button icon-button-phone" href={`tel:${primaryContact.phone.replace(/\s/g, '')}`} aria-label={`联系${primaryContact.name}`} title="打电话">
+            <button className="icon-button icon-button-phone" onClick={demoCall} aria-label={`演示联系${primaryContact.name}`} title="演示联系流程">
               <PhoneCall aria-hidden="true" />
-            </a>
+            </button>
           </section>
         </aside>
       </div>
@@ -327,10 +362,7 @@ export function SeniorApp({ notify }: SeniorAppProps) {
         open={voiceOpen}
         title="说一句今天的情况"
         description="只保留转成文字后的必要信息，原始音频不长期保存。"
-        onClose={() => {
-          stopListening();
-          setVoiceOpen(false);
-        }}
+        onClose={closeVoiceModal}
       >
         <form className="voice-form" onSubmit={submitVoice}>
           <button
@@ -352,7 +384,7 @@ export function SeniorApp({ notify }: SeniorAppProps) {
             />
           </label>
           <div className="modal-actions-row">
-            <button className="button button-outline" type="button" onClick={() => setVoiceOpen(false)}>取消</button>
+            <button className="button button-outline" type="button" onClick={closeVoiceModal}>取消</button>
             <button className="button button-primary" type="submit"><Check aria-hidden="true" />生成今日回执</button>
           </div>
         </form>

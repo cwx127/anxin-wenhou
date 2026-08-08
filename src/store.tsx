@@ -7,6 +7,7 @@ import {
   type QuickCheckInResponse,
 } from './checkin';
 import { createDemoData } from './data';
+import { APP_STORAGE_KEY, readStorage, writeStorage } from './storage';
 import type {
   AppData,
   CheckInSession,
@@ -16,7 +17,7 @@ import type {
   FollowUpAnswer,
 } from './types';
 
-const STORAGE_KEY = 'anxin-checkin-mvp-v2';
+const STORAGE_VERSION = 3;
 
 type AppStore = {
   data: AppData;
@@ -51,18 +52,102 @@ const stateForReceipt = (receipt: CheckInReceipt): CheckInState => {
   return 'stable';
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object';
+
+const isString = (value: unknown): value is string => typeof value === 'string';
+
+const isReceipt = (value: unknown): value is CheckInReceipt => {
+  if (!isRecord(value)) return false;
+  const validFollowUp = value.followUp === null
+    || (isRecord(value.followUp) && isString(value.followUp.question) && isString(value.followUp.reason));
+  const validMedication = ['taken', 'missed', 'question', 'not-mentioned'].includes(String(value.medicationMention));
+  return (value.status === 'responded' || value.status === 'unanswered')
+    && (value.level === 'normal' || value.level === 'attention' || value.level === 'urgent')
+    && isString(value.headline)
+    && isString(value.summary)
+    && isString(value.suggestedAction)
+    && validFollowUp
+    && validMedication
+    && (value.sourceText === null || isString(value.sourceText))
+    && typeof value.isFallback === 'boolean'
+    && Array.isArray(value.evidence)
+    && value.evidence.every((item) =>
+      isRecord(item)
+      && (item.source === 'senior' || item.source === 'system')
+      && isString(item.quote)
+      && isString(item.meaning),
+    );
+};
+
 const isCurrentData = (value: unknown): value is AppData => {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Partial<AppData>;
-  return Boolean(candidate.checkIn?.timeline && candidate.settings?.scheduleTime && candidate.reminder);
+  if (!isRecord(value)) return false;
+  const { senior, checkIn, reminder, messages, contacts, settings } = value;
+  if (!isRecord(senior) || !isRecord(checkIn) || !isRecord(reminder) || !isRecord(settings)) return false;
+
+  const validState = ['pending', 'stable', 'attention', 'urgent', 'no-response'].includes(String(checkIn.state));
+  const validFamilyAction = ['none', 'pending', 'contacted', 'closed'].includes(String(checkIn.familyAction));
+  const validTimeline = Array.isArray(checkIn.timeline) && checkIn.timeline.every((item) =>
+    isRecord(item)
+    && isString(item.id)
+    && (item.actor === 'system' || item.actor === 'senior' || item.actor === 'family')
+    && isString(item.title)
+    && isString(item.detail)
+    && isString(item.occurredAt),
+  );
+  const validReceipt = checkIn.receipt === null || isReceipt(checkIn.receipt);
+  const validContacts = Array.isArray(contacts) && contacts.length > 0 && contacts.every((contact) =>
+    isRecord(contact)
+    && isString(contact.id)
+    && isString(contact.name)
+    && isString(contact.relation)
+    && isString(contact.phone)
+    && typeof contact.priority === 'number',
+  );
+  const validMessages = Array.isArray(messages) && messages.every((message) =>
+    isRecord(message)
+    && isString(message.id)
+    && isString(message.author)
+    && isString(message.text)
+    && isString(message.sentAt)
+    && typeof message.played === 'boolean',
+  );
+
+  return isString(senior.name)
+    && isString(senior.preferredName)
+    && isString(senior.city)
+    && isString(senior.lastActiveAt)
+    && validState
+    && validFamilyAction
+    && isString(checkIn.id)
+    && isString(checkIn.scheduledAt)
+    && (checkIn.respondedAt === null || isString(checkIn.respondedAt))
+    && typeof checkIn.attempts === 'number'
+    && validTimeline
+    && validReceipt
+    && isString(reminder.id)
+    && isString(reminder.title)
+    && isString(reminder.detail)
+    && isString(reminder.dueTime)
+    && (reminder.completedAt === null || isString(reminder.completedAt))
+    && validContacts
+    && validMessages
+    && isString(settings.scheduleTime)
+    && typeof settings.retryMinutes === 'number'
+    && typeof settings.maxAttempts === 'number'
+    && typeof settings.shareExactQuote === 'boolean'
+    && settings.storeRawAudio === false;
 };
 
 const loadData = () => {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = readStorage(APP_STORAGE_KEY);
     if (!saved) return createDemoData();
     const parsed: unknown = JSON.parse(saved);
-    return isCurrentData(parsed) ? parsed : createDemoData();
+    if (!isRecord(parsed) || parsed.version !== STORAGE_VERSION || !isCurrentData(parsed.data)) {
+      return createDemoData();
+    }
+    return parsed.data;
   } catch {
     return createDemoData();
   }
@@ -196,7 +281,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(loadData);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    writeStorage(APP_STORAGE_KEY, JSON.stringify({ version: STORAGE_VERSION, data }));
   }, [data]);
 
   const submitInput = (input: CheckInInput) => {
