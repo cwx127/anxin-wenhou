@@ -5,7 +5,15 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { StoreProvider } from './store';
 import './styles.css';
 
-createRoot(document.getElementById('root')!).render(
+const rootElement = document.getElementById('root');
+
+if (!rootElement) {
+  throw new Error('Application root element is missing');
+}
+
+rootElement.dataset.build = '2026.08.08.3';
+
+createRoot(rootElement).render(
   <StrictMode>
     <ErrorBoundary>
       <StoreProvider>
