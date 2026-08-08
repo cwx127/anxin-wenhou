@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.log
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+.DS_Store
+docs/.pitch-build/
+docs/安心问候-商演项目说明/
+*.inspect.ndjson
+00-从这里开始.txt
