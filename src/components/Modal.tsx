@@ -14,8 +14,13 @@ type ModalProps = {
 export function Modal({ open, title, description, onClose, children, size = 'default' }: ModalProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
+  const onCloseRef = useRef(onClose);
   const titleId = useId();
   const descriptionId = useId();
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -25,12 +30,12 @@ export function Modal({ open, title, description, onClose, children, size = 'def
     const previousOverflow = document.body.style.overflow;
     appRoot?.setAttribute('inert', '');
     document.body.style.overflow = 'hidden';
-    window.requestAnimationFrame(() => closeRef.current?.focus());
+    const focusFrame = window.requestAnimationFrame(() => closeRef.current?.focus());
 
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== 'Tab') return;
@@ -51,12 +56,13 @@ export function Modal({ open, title, description, onClose, children, size = 'def
     };
     document.addEventListener('keydown', handleKey);
     return () => {
+      window.cancelAnimationFrame(focusFrame);
       document.removeEventListener('keydown', handleKey);
       if (appRoot && !appWasInert) appRoot.removeAttribute('inert');
       document.body.style.overflow = previousOverflow;
       previouslyFocused?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
